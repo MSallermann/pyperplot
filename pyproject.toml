@@ -1,0 +1,28 @@
+[project]
+name = "PyperPlot"
+version = "0.1.0"
+requires-python = ">= 3.9"
+authors = [{ name = "Moritz Sallermann", email = "moritzsallermann@gmail.com" }]
+description = "A class to lay out matplotlib plots in a grid with absolute measurements."
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/MSallermann/pyperplot"
+Issues = "https://github.com/MSallermann/pyperplot/issues"
+
+[tool.ruff]
+line-length = 85
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint]
+exclude = ["noxfile.py"]
