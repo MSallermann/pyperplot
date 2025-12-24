@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import numpy as np
+import numpy.typing as npt
+from typing import Literal
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import FancyBboxPatch
 from PIL import Image
 from typing import Any, TypeVar, Callable
+from pathlib import Path
 
 T = TypeVar("T")
 
@@ -57,7 +60,7 @@ class PyperPlot:
     offset_dr = (offset_r + offset_d) / np.sqrt(2)
     offset_dl = (offset_l + offset_d) / np.sqrt(2)
 
-    offset_dict = {
+    offset_dict: dict[str, Any] = {
         "u": offset_u,
         "r": offset_r,
         "l": offset_l,
@@ -68,7 +71,7 @@ class PyperPlot:
         "dl": offset_dl,
     }
 
-    default_rcParams = {
+    default_rcParams: dict[str, Any] = {
         "font.size": 8,
         "font.family": "serif",
         "mathtext.fontset": "dejavuserif",
@@ -85,8 +88,8 @@ class PyperPlot:
         ncols: int = 1,
         rcParams: dict[str, Any] | None = None,
     ) -> None:
-        self._ncow: int = ncols
-        self._nrow: int = nrows
+        self._ncols: int = ncols
+        self._nrows: int = nrows
         self.width: float = width
         self.height: float | None = height
 
@@ -466,10 +469,6 @@ class PyperPlot:
                 abs_content_width_or_height=abs_content_height,
                 abs_widths_or_heights=abs_heights,
             )
-        else:  # We should never get here
-            raise Exception(
-                "Something went wrong! `abs_heights` and `abs_content_height` are both None. We should never get here..."
-            )
 
         # Compute the relative quantities that gridpsec needs
         self.hspace = abs_hspace / abs_content_height * self.nrows
@@ -486,7 +485,7 @@ class PyperPlot:
     def fig(self):
         """Get the underlying figure object"""
         if self._fig is None:
-            self._fig = plt.figure(figsize=(self.width, self.height))
+            self._fig = plt.figure(figsize=(self.width, self.height))  # type: ignore
         return self._fig
 
     def gs(self):
@@ -508,7 +507,13 @@ class PyperPlot:
         return self._gs
 
     @staticmethod
-    def label_subplot(ax, text, pad_x=0.0, pad_y=0.025, **kwargs):
+    def label_subplot(
+        ax: Axes,
+        text: str,
+        pad_x: float = 0.0,
+        pad_y: float = 0.025,
+        **kwargs: dict[str, Any],
+    ):
         """Labels a subplot at the left upper corner. Wrapper around ax.text"""
         if pad_x >= 0.0:
             ha = "left"
@@ -531,7 +536,7 @@ class PyperPlot:
         )
 
     @staticmethod
-    def annotate(ax, text, pos=[0, 0.98], **kwargs):
+    def annotate(ax: Axes, text: str, pos: tuple[float] = (0.0, 0.98), **kwargs):
         """Annotate an ax with some text. Wrapper around ax.text.
 
         Args:
@@ -546,7 +551,7 @@ class PyperPlot:
             **kwargs,
         )
 
-    def add_box_around_image(self, ax, axes_image, **kwargs):
+    def add_box_around_image(self, ax: Axes, axes_image, **kwargs):
         """Adds a box patch around an axis.
 
         Args:
@@ -566,12 +571,16 @@ class PyperPlot:
         return fancy
 
     @staticmethod
-    def open_image(path):
+    def open_image(path: str | Path):
         return np.array(Image.open(path))
 
     @staticmethod
-    def replace_background_color(image, replacement_color, background_color=None):
-        """Replaced the backgroudn color of an image, specified as a numpy array.
+    def replace_background_color(
+        image: np.ndarray,
+        replacement_color: Sequence[float],
+        background_color: Sequence[float] | None = None,
+    ):
+        """Replaced the backgroudd color of an image, specified as a numpy array.
 
         Args:
             image (np.Array): The image array
@@ -595,7 +604,7 @@ class PyperPlot:
                     if np.all(cc == cc2):
                         background_color = cc
                         break
-                if np.all(cc == cc2):
+                if np.all(cc == corner_colors[-1]):
                     break
             background_color = corner_colors[0]
 
@@ -618,7 +627,11 @@ class PyperPlot:
         return image
 
     @staticmethod
-    def crop_to_content(image, background_color=None, replace_background_color=None):
+    def crop_to_content(
+        image: np.ndarray,
+        background_color: Sequence[float] | None = None,
+        replace_background_color: Sequence[float] | None = None,
+    ):
         """Crops an image array to its content."""
         N_CHANNELS = image.shape[-1]  # Number of channels in the picture
         image_shape = image.shape
@@ -634,7 +647,7 @@ class PyperPlot:
                     if np.all(cc == cc2):
                         background_color = cc
                         break
-                if np.all(cc == cc2):
+                if np.all(cc == corner_colors[-1]):
                     break
 
             background_color = corner_colors[0]
@@ -655,12 +668,14 @@ class PyperPlot:
                 image_copy = np.ones(shape=(image_shape[0], image_shape[1], 4))
                 image_copy[:, :, :3] = image
                 image = image_copy
+
+                assert background_color is not None  # for type checker
                 background_color = [
                     *background_color,
                     1.0,
                 ]  # Extend the background color with the alpha channel
             elif N_CHANNELS_BG < N_CHANNELS:
-                replace_background_color = [*replace_background_color, 1.0]
+                replace_background_color = (*replace_background_color, 1.0)
 
             indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
             image[indices[:, 0], indices[:, 1], :] = replace_background_color
@@ -668,7 +683,9 @@ class PyperPlot:
         return image[lower_height : upper_height + 1, lower_width : upper_width + 1, :]
 
     @staticmethod
-    def crop(image, left=0, right=0, top=0, bottom=0):
+    def crop(
+        image: np.ndarray, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0
+    ):
         """Crops an image by removing pixels from the left, right, top and bottom"""
         assert left >= 0 and right >= 0 and top >= 0 and bottom >= 0
 
@@ -692,14 +709,14 @@ class PyperPlot:
 
     def create_inset_axis(
         self,
-        containing_ax,
-        rel_width=0.5,
-        rel_height=0.5,
-        margin_x=0.0,
-        margin_y=0.0,
-        x_align="left",
-        y_align="bottom",
-    ):
+        containing_ax: Axes,
+        rel_width: float = 0.5,
+        rel_height: float = 0.5,
+        margin_x: float = 0.0,
+        margin_y: float = 0.0,
+        x_align: Literal["left", "right", "center"] = "left",
+        y_align: Literal["bottom", "top", "center"] = "bottom",
+    ) -> Axes:
         """Creates an axis for an inset.
 
         Args:
@@ -715,12 +732,19 @@ class PyperPlot:
             plt.Axes: The inset Axes object
 
         """
-        pos = containing_ax.get_position(self._fig)
+        bbox = containing_ax.get_position()
 
-        w = pos.x1 - pos.x0
-        h = pos.y1 - pos.y0
+        w = bbox.x1 - bbox.x0
+        h = bbox.y1 - bbox.y0
 
-        def helper(old_var0, old_var1, align, wh, rel_width_height, margin_xy):
+        def helper(
+            old_var0: float,
+            old_var1: float,
+            align: str,
+            wh: float,
+            rel_width_height: float,
+            margin_xy: float,
+        ) -> tuple[float, float]:
             if align == "left" or align == "bottom":
                 new_var0 = old_var0 + margin_xy * rel_width_height * wh
                 new_var1 = new_var0 + rel_width_height * wh
@@ -734,22 +758,23 @@ class PyperPlot:
                 raise Exception(f"unknown align: {align}")
             return new_var0, new_var1
 
-        pos.x0, pos.x1 = helper(pos.x0, pos.x1, x_align, w, rel_width, margin_x)
-        pos.y0, pos.y1 = helper(pos.y0, pos.y1, y_align, h, rel_height, margin_y)
+        x0, x1 = helper(bbox.x0, bbox.x1, x_align, w, rel_width, margin_x)
+        y0, y1 = helper(bbox.y0, bbox.y1, y_align, h, rel_height, margin_y)
 
-        return self._fig.add_axes(pos)
+        assert self._fig is not None
+        return self._fig.add_axes(rect=(x0, y0, x1, y1))
 
     @staticmethod
-    def image_to_ax(ax, image):
+    def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[Any]):
         import os
 
-        if isinstance(image, str):
+        if isinstance(image, str | Path):
             if os.path.exists(image):
-                image = Paper_Plot.open_image(image)
+                image = PyperPlot.open_image(image)
             else:
                 raise Exception(f"`{image}` does not exist")
 
-        ax.tick_params(
+        ax.tick_params(  # type: ignore
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
         ax.set_facecolor([0, 0, 0, 0])
@@ -759,7 +784,7 @@ class PyperPlot:
         return ax.imshow(image)
 
     @staticmethod
-    def clear_spines(ax):
+    def clear_spines(ax: Axes) -> Axes:
         ax.set_facecolor([0, 0, 0, 0])
         ax.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
@@ -781,7 +806,7 @@ class PyperPlot:
             a = self._fig.add_axes(
                 spec.get_position(self._fig), zorder=zorder, label=label
             )
-        except:
+        except Exception as e:
             a = self._fig.add_axes(spec, zorder=zorder, label=label)
 
         a.set_facecolor([0, 0, 0, 0])
@@ -857,7 +882,7 @@ class PyperPlot:
             self.annotation_dict[key]["annotate_increment"] += 1
 
         if type(xy_text) is str:
-            xy_text = Paper_Plot.offset_dict[xy_text.lower()]
+            xy_text = PyperPlot.offset_dict[xy_text.lower()]
 
         if key is not None:
             self.annotation_dict[key]["annotation_list"].append([xy, text])
