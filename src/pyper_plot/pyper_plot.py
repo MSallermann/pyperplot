@@ -71,32 +71,17 @@ class PyperPlot:
         "dl": offset_dl,
     }
 
-    default_rcParams: dict[str, Any] = {
-        "font.size": 8,
-        "font.family": "serif",
-        "mathtext.fontset": "dejavuserif",
-        "xtick.labelsize": 7,
-        "ytick.labelsize": 7,
-        "axes.labelsize": 8,
-    }
-
     def __init__(
         self,
         width: float,
         height: float | None = None,
         nrows: int = 1,
         ncols: int = 1,
-        rcParams: dict[str, Any] | None = None,
     ) -> None:
         self._ncols: int = ncols
         self._nrows: int = nrows
         self.width: float = width
         self.height: float | None = height
-
-        if rcParams is None:
-            rcParams = self.default_rcParams
-
-        mpl.rcParams.update(rcParams)
 
         self.annotate_letter: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
