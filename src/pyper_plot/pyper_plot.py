@@ -104,9 +104,7 @@ class PyperPlot:
         res = "Paper_Plot\n"
         res += f"\t width  = {self.width:.3f} inch ({self.width / self.cm:.3f} cm)\n"
         if self.height is not None:
-            res += (
-                f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
-            )
+            res += f"\t height = {self.height:.3f} inch ({self.height / self.cm:.3f} cm)\n"
         res += f"\t ncols  = {self.ncols}\n"
         res += f"\t nrows  = {self.nrows}\n"
         res += f"\t wspace = {self.wspace:.3f}\n"
@@ -187,7 +185,9 @@ class PyperPlot:
         if len(value) == self.ncols:
             self._width_ratios = list(value)
         else:
-            raise Exception(f"Length of width_ratios has to match ncols {self.ncols}")
+            raise Exception(
+                f"Length of width_ratios has to match ncols {self.ncols}"
+            )
 
     @property
     def height_ratios(self) -> list[float] | None:
@@ -247,7 +247,9 @@ class PyperPlot:
         if len(value) == 2:
             self._vertical_margins = list(value)
         else:
-            msg = f"vertical_margins has to have shape (2,) but you specified {value}"
+            msg = (
+                f"vertical_margins has to have shape (2,) but you specified {value}"
+            )
             raise Exception(msg)
 
     def height_from_aspect_ratio(self, aspect_ratio: float):
@@ -276,7 +278,9 @@ class PyperPlot:
         rel_total_hspace_between_subplots = (
             rel_average_subplot_height * self.hspace * (self.nrows - 1)
         )
-        height_prefactor = rel_height_minus_margins - rel_total_hspace_between_subplots
+        height_prefactor = (
+            rel_height_minus_margins - rel_total_hspace_between_subplots
+        )
 
         self.height = self.width / aspect_ratio * width_prefactor / height_prefactor
 
@@ -292,9 +296,7 @@ class PyperPlot:
         )
 
         if content_extent <= 0.0:
-            msg = (
-                "Margins and space are too big. There is no space left for the content."
-            )
+            msg = "Margins and space are too big. There is no space left for the content."
             raise Exception(msg)
 
         return content_extent
@@ -312,7 +314,6 @@ class PyperPlot:
     def compute_content_ratios(
         abs_content_width_or_height: float, abs_widths_or_heights: Sequence[float]
     ) -> list[float]:
-
         # Count how many of the widths are greater than zero
         num_widths_greater_than_zero = count_predicate(
             abs_widths_or_heights, greater_than_zero
@@ -458,7 +459,9 @@ class PyperPlot:
         # Compute the relative quantities that gridpsec needs
         self.hspace = abs_hspace / abs_content_height * self.nrows
         self.wspace = abs_wspace / abs_content_width * self.ncols
-        self.height = abs_content_height + abs_margin_h + abs_hspace * (self.nrows - 1)
+        self.height = (
+            abs_content_height + abs_margin_h + abs_hspace * (self.nrows - 1)
+        )
         self.horizontal_margins = [m / self.width for m in abs_horizontal_margins]
         self.vertical_margins = [m / self.height for m in abs_vertical_margins]
 
@@ -665,11 +668,17 @@ class PyperPlot:
             indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
             image[indices[:, 0], indices[:, 1], :] = replace_background_color
 
-        return image[lower_height : upper_height + 1, lower_width : upper_width + 1, :]
+        return image[
+            lower_height : upper_height + 1, lower_width : upper_width + 1, :
+        ]
 
     @staticmethod
     def crop(
-        image: np.ndarray, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0
+        image: np.ndarray,
+        left: int = 0,
+        right: int = 0,
+        top: int = 0,
+        bottom: int = 0,
     ):
         """Crops an image by removing pixels from the left, right, top and bottom"""
         assert left >= 0 and right >= 0 and top >= 0 and bottom >= 0
@@ -791,7 +800,7 @@ class PyperPlot:
             a = self._fig.add_axes(
                 spec.get_position(self._fig), zorder=zorder, label=label
             )
-        except Exception as e:
+        except Exception:
             a = self._fig.add_axes(spec, zorder=zorder, label=label)
 
         a.set_facecolor([0, 0, 0, 0])
@@ -812,14 +821,18 @@ class PyperPlot:
             gs = self._gs
 
         col_indices = range(gs.ncols)[sl]
-        return [self._fig.add_subplot(gs[row_idx, col_idx]) for col_idx in col_indices]
+        return [
+            self._fig.add_subplot(gs[row_idx, col_idx]) for col_idx in col_indices
+        ]
 
     def col(self, col_idx, sl=slice(None, None, None), gs=None):
         if gs is None:
             gs = self._gs
 
         row_indices = list(range(gs.nrows)[sl])
-        return [self._fig.add_subplot(gs[row_idx, col_idx]) for row_idx in row_indices]
+        return [
+            self._fig.add_subplot(gs[row_idx, col_idx]) for row_idx in row_indices
+        ]
 
     def xy_text_auto(self, ax, xy, deriv, scale=15):
         trans_deriv = ax.transData.transform(
@@ -863,7 +876,9 @@ class PyperPlot:
         arrowprops = dict(arrowstyle="-")
 
         if text is None:
-            text = self.annotate_letter[self.annotation_dict[key]["annotate_increment"]]
+            text = self.annotate_letter[
+                self.annotation_dict[key]["annotate_increment"]
+            ]
             self.annotation_dict[key]["annotate_increment"] += 1
 
         if type(xy_text) is str:

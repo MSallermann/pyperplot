@@ -91,7 +91,7 @@ def test_aspect_ratio():
     print(pplot.info_string())
 
     fig = pplot.fig()
-    gs = pplot.gs()
+    _ = pplot.gs()
 
     for irow in range(pplot.nrows):
         for ax in pplot.row(irow):
@@ -125,7 +125,7 @@ def test_abs_margins():
     print(pplot.info_string())
 
     fig = pplot.fig()
-    gs = pplot.gs()
+    _ = pplot.gs()
 
     for irow in range(pplot.nrows):
         for ax in pplot.row(irow):
