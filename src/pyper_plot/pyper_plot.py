@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Iterable
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.image import AxesImage
+from matplotlib.typing import ColorType
 import numpy as np
 import numpy.typing as npt
 from typing import Literal
-from matplotlib.gridspec import GridSpec
+from matplotlib.gridspec import GridSpec, SubplotSpec
 from matplotlib.patches import FancyBboxPatch
 from PIL import Image
 from typing import Any, TypeVar, Callable
@@ -25,7 +27,7 @@ def smaller_eq_than_zero(w: float) -> bool:
     return w <= 0
 
 
-def count_predicate(seq: Sequence[T], pred: Callable[[T], bool]) -> int:
+def count_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> int:
     count: int = 0
     for t in seq:
         if pred(t):
@@ -33,7 +35,7 @@ def count_predicate(seq: Sequence[T], pred: Callable[[T], bool]) -> int:
     return count
 
 
-def filter_predicate(seq: Sequence[T], pred: Callable[[T], bool]) -> list[T]:
+def filter_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> list[T]:
     res: list[T] = []
     for t in seq:
         if pred(t):
@@ -96,7 +98,7 @@ class PyperPlot:
         self._fig = None
         self._gs = None
 
-        self.annotation_dict = {}
+        self.annotation_dict: dict[str, dict[str, Any]] = {}
 
     def info_string(self) -> str:
         """Return a string with information about the plot."""
@@ -423,7 +425,7 @@ class PyperPlot:
                 abs_margin_hw=abs_margin_w,
             )
 
-        # Compute the width ratios from absolute heights
+        # Compute the width ratios from absolute widths
         if abs_widths is not None:
             self.width_ratios = PyperPlot.compute_content_ratios(
                 abs_content_width_or_height=abs_content_width,
@@ -513,7 +515,7 @@ class PyperPlot:
         else:
             va = "top"
 
-        ax.text(
+        ax.text(  # pyright: ignore[reportUnknownMemberType]
             x=pad_x,
             y=1.0 + pad_y,
             s=text,
@@ -524,7 +526,12 @@ class PyperPlot:
         )
 
     @staticmethod
-    def annotate(ax: Axes, text: str, pos: tuple[float] = (0.0, 0.98), **kwargs):
+    def annotate(
+        ax: Axes,
+        text: str,
+        pos: Sequence[float] = (0.0, 0.98),
+        **kwargs: dict[str, Any],
+    ):
         """Annotate an ax with some text. Wrapper around ax.text.
 
         Args:
@@ -532,14 +539,17 @@ class PyperPlot:
             text (str): the text
 
         """
-        ax.text(
-            *pos,
+        ax.text(  # pyright: ignore[reportUnknownMemberType]
+            pos[0],
+            pos[1],
             text,
             transform=ax.transAxes,
             **kwargs,
         )
 
-    def add_box_around_image(self, ax: Axes, axes_image, **kwargs):
+    def add_box_around_image(
+        self, ax: Axes, axes_image: AxesImage, **kwargs: dict[str, Any]
+    ):
         """Adds a box patch around an axis.
 
         Args:
@@ -568,12 +578,12 @@ class PyperPlot:
         replacement_color: Sequence[float],
         background_color: Sequence[float] | None = None,
     ):
-        """Replaced the backgroudd color of an image, specified as a numpy array.
+        """Replaced the background color of an image, specified as a numpy array.
 
         Args:
             image (np.Array): The image array
-            replacement_color (the color): The color wich replaces the background color.
-            background_color (the background color, optional): The backgroudn color. If None it is inferred from the corners. Defaults to None.
+            replacement_color (the color): The color which replaces the background color.
+            background_color (the background color, optional): The background color. If None it is inferred from the corners. Defaults to None.
 
         Returns:
             np.Array: the new image array
@@ -603,6 +613,7 @@ class PyperPlot:
             image_copy = np.ones(shape=(image_shape[0], image_shape[1], 4))
             image_copy[:, :, :3] = image
             image = image_copy
+            assert background_color is not None
             background_color = [
                 *background_color,
                 1.0,
@@ -756,10 +767,14 @@ class PyperPlot:
         y0, y1 = helper(bbox.y0, bbox.y1, y_align, h, rel_height, margin_y)
 
         assert self._fig is not None
-        return self._fig.add_axes(rect=(x0, y0, x1, y1))
+        return self._fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
+            rect=(x0, y0, x1, y1)
+        )
 
     @staticmethod
-    def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[Any]):
+    def image_to_ax(
+        ax: Axes, image: str | Path | npt.NDArray[np.floating]
+    ) -> AxesImage:
         import os
 
         if isinstance(image, str | Path):
@@ -771,16 +786,17 @@ class PyperPlot:
         ax.tick_params(  # type: ignore
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
-        ax.set_facecolor([0, 0, 0, 0])
-        for k, s in ax.spines.items():
+        ax.set_facecolor((0, 0, 0, 0))
+
+        for s in ax.spines.values():
             s.set_visible(False)
 
-        return ax.imshow(image)
+        return ax.imshow(image)  # pyright: ignore[reportUnknownMemberType]
 
     @staticmethod
     def clear_spines(ax: Axes) -> Axes:
-        ax.set_facecolor([0, 0, 0, 0])
-        ax.tick_params(
+        ax.set_facecolor((0, 0, 0, 0))
+        ax.tick_params(  # pyright: ignore[reportUnknownMemberType]
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
         for k in ["left", "right", "top", "bottom"]:
@@ -790,20 +806,25 @@ class PyperPlot:
 
     def spine_axis(
         self,
-        spec,
-        color="black",
-        which=["left", "right", "top", "bottom"],
-        zorder=2,
-        label="spine",
+        spec: Axes | SubplotSpec,
+        color: ColorType = "black",
+        which: Sequence[Literal["left", "right", "top", "bottom"]] = [
+            "left",
+            "right",
+            "top",
+            "bottom",
+        ],
+        zorder: int = 2,
+        label: str = "spine",
     ):
         try:
-            a = self._fig.add_axes(
+            a = self._fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
                 spec.get_position(self._fig), zorder=zorder, label=label
             )
         except Exception:
             a = self._fig.add_axes(spec, zorder=zorder, label=label)
 
-        a.set_facecolor([0, 0, 0, 0])
+        a.set_facecolor((0, 0, 0, 0))
         a.tick_params(
             axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
         )
@@ -816,7 +837,12 @@ class PyperPlot:
                 s.set_visible(False)
         return a
 
-    def row(self, row_idx, sl=slice(None, None, None), gs=None):
+    def row(
+        self,
+        row_idx: int,
+        sl: slice = slice(None, None, None),
+        gs: GridSpec | None = None,
+    ) -> list[Axes]:
         if gs is None:
             gs = self._gs
 
@@ -825,7 +851,12 @@ class PyperPlot:
             self._fig.add_subplot(gs[row_idx, col_idx]) for col_idx in col_indices
         ]
 
-    def col(self, col_idx, sl=slice(None, None, None), gs=None):
+    def col(
+        self,
+        col_idx: int,
+        sl: slice = slice(None, None, None),
+        gs: GridSpec | None = None,
+    ) -> list[Axes]:
         if gs is None:
             gs = self._gs
 
@@ -834,15 +865,16 @@ class PyperPlot:
             self._fig.add_subplot(gs[row_idx, col_idx]) for row_idx in row_indices
         ]
 
-    def xy_text_auto(self, ax, xy, deriv, scale=15):
+    def xy_text_auto(
+        self, ax: Axes, xy: npt.ArrayLike, deriv: float, scale: float = 15
+    ):
         trans_deriv = ax.transData.transform(
-            [[0, 0], [1, deriv]]
+            [[0.0, 0.0], [1.0, deriv]]
         )  # transform from data coordinates to display coordinates
         display_deriv = (trans_deriv[1, 1] - trans_deriv[0, 1]) / (
             trans_deriv[1, 0] - trans_deriv[0, 0]
         )
 
-        # display_deriv = trans_deriv[1]/trans_deriv[0] # transform to display derivative
         direction = np.array([display_deriv, -1])
         direction = direction / np.linalg.norm(direction)
 
@@ -863,7 +895,15 @@ class PyperPlot:
             return scale * sign_upper * direction
         return scale * sign_lower * direction
 
-    def annotate_graph(self, ax, xy, xy_text, text=None, key="key1", offset_scale=1):
+    def annotate_graph(
+        self,
+        ax: Axes,
+        xy: tuple[float, float],
+        xy_text: tuple[float, float],
+        text: str | None = None,
+        key: str | None = "key1",
+        offset_scale: float = 1.0,
+    ):
         if key is not None:
             if key not in self.annotation_dict:
                 self.annotation_dict[key] = {
@@ -871,7 +911,7 @@ class PyperPlot:
                     "annotation_list": [],
                 }
         elif text is None:
-            raise Exception("Need to specify text if key is None")
+            raise Exception("Need to specify text if `key` is None")
 
         arrowprops = dict(arrowstyle="-")
 
@@ -881,16 +921,16 @@ class PyperPlot:
             ]
             self.annotation_dict[key]["annotate_increment"] += 1
 
-        if type(xy_text) is str:
+        if isinstance(xy_text, str):
             xy_text = PyperPlot.offset_dict[xy_text.lower()]
 
         if key is not None:
             self.annotation_dict[key]["annotation_list"].append([xy, text])
 
-        ax.annotate(
+        ax.annotate(  # pyright: ignore[reportUnknownMemberType]
             text,
             xy,
-            xy_text * offset_scale,
+            (xy_text[0] * offset_scale, xy_text[1] * offset_scale),
             arrowprops=arrowprops,
             verticalalignment="center",
             horizontalalignment="center",
