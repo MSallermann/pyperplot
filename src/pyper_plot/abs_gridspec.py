@@ -2,7 +2,7 @@ from __future__ import annotations
 from matplotlib.gridspec import GridSpec
 from collections.abc import Sequence, Iterable
 from dataclasses import dataclass
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 
 from typing import TypeVar, Callable
@@ -49,15 +49,17 @@ class GridSpecParams:
 
 
 class AbsoluteGridSpec(GridSpec):
+    cm = 1.0 / 2.54
+
     def __init__(
         self,
         nrows: int,
         ncols: int,
-        figure: plt.Figure,
-        abs_left: float,
-        abs_bottom: float,
-        abs_right: float,
-        abs_top: float,
+        figure: Figure,
+        abs_margin_left: float,
+        abs_margin_bottom: float,
+        abs_margin_right: float,
+        abs_margin_top: float,
         abs_wspace: float = 0.1,
         abs_hspace: float = 0.1,
         abs_widths: Sequence[float] | None = None,
@@ -71,8 +73,8 @@ class AbsoluteGridSpec(GridSpec):
             figure=figure,
             abs_hspace=abs_hspace,
             abs_wspace=abs_wspace,
-            abs_vertical_margins=[abs_bottom, abs_top],
-            abs_horizontal_margins=[abs_left, abs_right],
+            abs_vertical_margins=[abs_margin_bottom, abs_margin_top],
+            abs_horizontal_margins=[abs_margin_left, abs_margin_right],
             abs_heights=abs_heights,
             abs_widths=abs_widths,
             abs_content_width=abs_content_width,
@@ -130,15 +132,14 @@ class AbsoluteGridSpec(GridSpec):
             abs_widths_or_heights, greater_than_zero
         )
 
-        if num_widths_greater_than_zero == 0:
-            # If there are no relative widths left to distribute, we have no slack.
+        if num_widths_greater_than_zero != 0:
+            # If there are no relative widths to distribute, we have no slack.
             # This means we check that the sum of absolute widths matches the content width
             if not np.isclose(
                 np.sum(abs_widths_or_heights), abs_content_width_or_height
             ):
-                raise Exception(
-                    "The absolute widths do not match the expected width of the plot content. You should make at least one of them relative by specifying a negative number."
-                )
+                msg = "The absolute widths (or heights) do not match the expected width (or height) of the plot content. You should make at least one of them relative by specifying a negative number."
+                raise Exception(msg)
 
         content_ratios = [
             w / abs_content_width_or_height for w in abs_widths_or_heights
@@ -150,9 +151,10 @@ class AbsoluteGridSpec(GridSpec):
         )
 
         if remaining_width_or_height < 0.0:
-            raise Exception("Absolute widths/heights are larger than total width")
+            msg = "Absolute widths/heights are larger than total width"
+            raise Exception(msg)
 
-        # Then we compute the total weight of the negative widths
+        # Then, we compute the total weight of the negative widths
         total_weight_of_relative_widths = sum(
             filter_predicate(abs_widths_or_heights, smaller_eq_than_zero)
         )
@@ -188,7 +190,7 @@ class AbsoluteGridSpec(GridSpec):
 
     @staticmethod
     def compute_gridspec_params(
-        figure: plt.Figure,
+        figure: Figure,
         nrows: int,
         ncols: int,
         abs_hspace: float,
@@ -215,7 +217,7 @@ class AbsoluteGridSpec(GridSpec):
         """
         fig_width, fig_height = figure.get_size_inches()
 
-        # Compute the absolute space, taken up by the margins
+        # Compute the absolute space taken up by the margins
         assert len(abs_horizontal_margins) == 2
         abs_margin_w = float(sum(abs_horizontal_margins))
 
@@ -278,8 +280,11 @@ class AbsoluteGridSpec(GridSpec):
         wspace = abs_wspace / abs_content_width * ncols
         fig_height = abs_content_height + abs_margin_h + abs_hspace * (nrows - 1)
 
-        left, right = (m / fig_width for m in abs_horizontal_margins)
-        bottom, top = (m / fig_height for m in abs_vertical_margins)
+        left = abs_horizontal_margins[0] / fig_width
+        right = 1.0 - abs_horizontal_margins[1] / fig_width
+
+        bottom = abs_vertical_margins[0] / fig_height
+        top = 1.0 - abs_vertical_margins[0] / fig_height
 
         return GridSpecParams(
             fig_height=fig_height,
