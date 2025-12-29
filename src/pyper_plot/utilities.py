@@ -4,20 +4,25 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 from matplotlib.text import Text
-from matplotlib.gridspec import GridSpecBase
-import numpy as np
-import numpy.typing as npt
+from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.typing import ColorType, LineStyleType
+from collections.abc import Sequence
 from typing import Literal
 from matplotlib.patches import FancyBboxPatch
-from PIL import Image
 from typing import Any
-import os
-from pathlib import Path
+
+_DEFAULT_SLICE = slice(None, None, None)
 
 
 def gs_row(
-    idx_row: int, gs: GridSpecBase, fig: Figure, idx_slice: slice
+    idx_row: int,
+    gs: GridSpec,
+    fig: Figure | None = None,
+    idx_slice: slice = _DEFAULT_SLICE,
 ) -> list[Axes]:
+    if fig is None:
+        fig = gs.figure
+    assert fig is not None
     return [
         fig.add_subplot(gs[idx_row, idx_col])
         for idx_col in range(gs.ncols)[idx_slice]
@@ -25,8 +30,14 @@ def gs_row(
 
 
 def gs_col(
-    idx_col: int, gs: GridSpecBase, fig: Figure, idx_slice: slice
+    idx_col: int,
+    gs: GridSpec,
+    fig: Figure | None = None,
+    idx_slice: slice = _DEFAULT_SLICE,
 ) -> list[Axes]:
+    if fig is None:
+        fig = gs.figure
+    assert fig is not None
     return [
         fig.add_subplot(gs[idx_col, idx_row])
         for idx_row in range(gs.nrows)[idx_slice]
@@ -82,6 +93,46 @@ def add_box_around_image(
     fancy = FancyBboxPatch((left, bottom), width, height, **kwargs)
     ax.add_patch(fancy)
     return fancy
+
+
+def spine_axis(
+    fig: Figure,
+    spec: Axes | SubplotSpec,
+    color: ColorType = "black",
+    which: Sequence[Literal["left", "right", "top", "bottom"]] = [
+        "left",
+        "right",
+        "top",
+        "bottom",
+    ],
+    zorder: int = 2,
+    label: str = "spine",
+    linewidth: float | None = None,
+    linestyle: LineStyleType | None = None,
+    alpha: float | None = None,
+):
+    try:
+        a = fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
+            spec.get_position(fig), zorder=zorder, label=label
+        )
+    except Exception:
+        a = fig.add_axes(spec, zorder=zorder, label=label)
+
+    a.set_facecolor((0, 0, 0, 0))
+    a.tick_params(
+        axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
+    )
+    for k in ["left", "right", "top", "bottom"]:
+        s = a.spines[k]
+        if k in which:
+            s.set_linewidth(linewidth)
+            s.set_linestyle(linestyle)
+            s.set_visible(True)
+            s.set_alpha(alpha)
+            s.set_color(color)
+        else:
+            s.set_visible(False)
+    return a
 
 
 def create_inset_axis(
@@ -141,28 +192,6 @@ def create_inset_axis(
     return fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
         rect=(x0, y0, x1, y1)
     )
-
-
-def open_image(path: str | Path) -> np.ndarray:
-    return np.array(Image.open(path))
-
-
-def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[np.floating]) -> AxesImage:
-    if isinstance(image, str | Path):
-        if os.path.exists(image):
-            image = open_image(image)
-        else:
-            raise Exception(f"`{image}` does not exist")
-
-    ax.tick_params(  # type: ignore
-        axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
-    )
-    ax.set_facecolor((0, 0, 0, 0))
-
-    for s in ax.spines.values():
-        s.set_visible(False)
-
-    return ax.imshow(image)  # pyright: ignore[reportUnknownMemberType]
 
 
 def clear_spines(ax: Axes) -> Axes:
