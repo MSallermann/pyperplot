@@ -78,8 +78,8 @@ def test_aspect_ratio():
     gs = AbsoluteGridSpec(
         nrows=NROWS,
         ncols=NCOLS,
-        abs_content_height=NROWS * 2 * CM,
         abs_content_width=NCOLS * 2 * CM,
+        abs_content_height=NROWS * 2 * CM,
         figure=fig,
         abs_margin_left=0.05,
         abs_margin_right=0.1,

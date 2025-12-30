@@ -81,7 +81,10 @@ class AbsoluteGridSpec(GridSpec):
             abs_content_height=abs_content_height,
         )
 
-        figure.set_size_inches(gridpsec_params.fig_height, gridpsec_params.fig_width)
+        figure.set_size_inches(
+            gridpsec_params.fig_width,
+            gridpsec_params.fig_height,
+        )
 
         super().__init__(
             nrows=nrows,
