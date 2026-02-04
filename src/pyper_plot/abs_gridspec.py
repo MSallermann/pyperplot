@@ -10,12 +10,12 @@ from typing import TypeVar, Callable
 T = TypeVar("T")
 
 
-def greater_than_zero(w: float) -> bool:
-    return w > 0
+def greater_eq_than_zero(w: float) -> bool:
+    return w >= 0
 
 
-def smaller_eq_than_zero(w: float) -> bool:
-    return w <= 0
+def smaller_than_zero(w: float) -> bool:
+    return w < 0
 
 
 def count_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> int:
@@ -67,6 +67,7 @@ class AbsoluteGridSpec(GridSpec):
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
     ) -> None:
+
         gridpsec_params = AbsoluteGridSpec.compute_gridspec_params(
             nrows=nrows,
             ncols=ncols,
@@ -130,18 +131,21 @@ class AbsoluteGridSpec(GridSpec):
     def compute_content_ratios(
         abs_content_width_or_height: float, abs_widths_or_heights: Sequence[float]
     ) -> list[float]:
-        # Count how many of the widths are greater than zero
-        num_widths_greater_than_zero = count_predicate(
-            abs_widths_or_heights, greater_than_zero
+
+        # Count how many of the widths are smaller than zero
+        num_widths_smaller_than_zero = count_predicate(
+            abs_widths_or_heights, smaller_than_zero
         )
 
-        if num_widths_greater_than_zero != 0:
+        if num_widths_smaller_than_zero == 0:
             # If there are no relative widths to distribute, we have no slack.
             # This means we check that the sum of absolute widths matches the content width
+
             if not np.isclose(
                 np.sum(abs_widths_or_heights), abs_content_width_or_height
             ):
-                msg = "The absolute widths (or heights) do not match the expected width (or height) of the plot content. You should make at least one of them relative by specifying a negative number."
+                msg = f"You have specified absolute heights(widths) for the rows(columns) and an absolute height(width) of the content. The problem is that the sum of them is {np.sum(abs_widths_or_heights):.2f}, while the specified height(width) of the content is {abs_content_width_or_height:.2f}. These should be the same! A solution would be to adjust your specification or to make at least one of the row(column) heights(widths) relative by specifying a negative number."
+
                 raise Exception(msg)
 
         content_ratios = [
@@ -150,7 +154,7 @@ class AbsoluteGridSpec(GridSpec):
 
         # Compute the remaining width, to be distributed according to the relative weights
         remaining_width_or_height = abs_content_width_or_height - sum(
-            filter_predicate(abs_widths_or_heights, greater_than_zero)
+            filter_predicate(abs_widths_or_heights, greater_eq_than_zero)
         )
 
         if remaining_width_or_height < 0.0:
@@ -159,7 +163,7 @@ class AbsoluteGridSpec(GridSpec):
 
         # Then, we compute the total weight of the negative widths
         total_weight_of_relative_widths = sum(
-            filter_predicate(abs_widths_or_heights, smaller_eq_than_zero)
+            filter_predicate(abs_widths_or_heights, smaller_than_zero)
         )
 
         # Iterate over all the widths
@@ -255,6 +259,7 @@ class AbsoluteGridSpec(GridSpec):
 
         # If the content height has not been specified, we compute it based on the current figure height
         # If it has been specified we compute the total figure height based on it
+
         if abs_content_height is None:
             abs_content_height = AbsoluteGridSpec.compute_content_extent(
                 total_extent=fig_height,
