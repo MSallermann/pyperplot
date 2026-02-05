@@ -14,6 +14,31 @@ from typing import Any
 _DEFAULT_SLICE = slice(None, None, None)
 
 
+def create_n_axes(
+    gs: GridSpec, n: int, fig: Figure | None = None
+) -> list[tuple[Axes, int, int]]:
+
+    max_axes = gs.nrows * gs.ncols
+    if n > max_axes:
+        raise Exception(
+            f"Cannot create {n} axes on this gridspec with {gs.nrows} rows and {gs.ncols} cols. Maximum is {max_axes}."
+        )
+
+    if fig is None:
+        fig = gs.figure
+    assert fig is not None
+
+    result = []
+    for irow in range(gs.nrows):
+        for icol in range(gs.ncols):
+            ax = fig.add_subplot(gs[irow, icol])
+            result.append((ax, irow, icol))
+            if len(result) == n:
+                return result
+
+    return result
+
+
 def gs_row(
     idx_row: int,
     gs: GridSpec,
