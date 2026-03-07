@@ -67,7 +67,6 @@ class AbsoluteGridSpec(GridSpec):
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
     ) -> None:
-
         gridpsec_params = AbsoluteGridSpec.compute_gridspec_params(
             nrows=nrows,
             ncols=ncols,
@@ -131,7 +130,6 @@ class AbsoluteGridSpec(GridSpec):
     def compute_content_ratios(
         abs_content_width_or_height: float, abs_widths_or_heights: Sequence[float]
     ) -> list[float]:
-
         # Count how many of the widths are smaller than zero
         num_widths_smaller_than_zero = count_predicate(
             abs_widths_or_heights, smaller_than_zero
@@ -292,7 +290,7 @@ class AbsoluteGridSpec(GridSpec):
         right = 1.0 - abs_horizontal_margins[1] / fig_width
 
         bottom = abs_vertical_margins[0] / fig_height
-        top = 1.0 - abs_vertical_margins[0] / fig_height
+        top = 1.0 - abs_vertical_margins[1] / fig_height
 
         return GridSpecParams(
             fig_height=fig_height,
