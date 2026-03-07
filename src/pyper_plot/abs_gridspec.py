@@ -49,6 +49,8 @@ class GridSpecParams:
 
 
 class AbsoluteGridSpec(GridSpec):
+    ATOL = 1e-5
+
     cm = 1.0 / 2.54
 
     def __init__(
@@ -140,7 +142,9 @@ class AbsoluteGridSpec(GridSpec):
             # This means we check that the sum of absolute widths matches the content width
 
             if not np.isclose(
-                np.sum(abs_widths_or_heights), abs_content_width_or_height
+                np.sum(abs_widths_or_heights),
+                abs_content_width_or_height,
+                atol=AbsoluteGridSpec.ATOL,
             ):
                 msg = f"You have specified absolute heights(widths) for the rows(columns) and an absolute height(width) of the content. The problem is that the sum of them is {np.sum(abs_widths_or_heights):.2f}, while the specified height(width) of the content is {abs_content_width_or_height:.2f}. These should be the same! A solution would be to adjust your specification or to make at least one of the row(column) heights(widths) relative by specifying a negative number."
 
@@ -155,8 +159,8 @@ class AbsoluteGridSpec(GridSpec):
             filter_predicate(abs_widths_or_heights, greater_eq_than_zero)
         )
 
-        if remaining_width_or_height < 0.0:
-            msg = "Absolute widths/heights are larger than total width"
+        if remaining_width_or_height < -AbsoluteGridSpec.ATOL:
+            msg = f"Absolute widths/heights are larger than total height/width. Remaining height/width = {remaining_width_or_height}."
             raise Exception(msg)
 
         # Then, we compute the total weight of the negative widths
