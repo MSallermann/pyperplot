@@ -7,10 +7,10 @@ absolute measurements. Lengths are specified in inches; use
 ```python
 import matplotlib.pyplot as plt
 
-from pyper_plot.abs_gridspec import AbsoluteGridSpec
+from pyper_plot import AbsoluteGridSpec
 
 fig = plt.figure(figsize=(6, 4))
-grid = AbsoluteGridSpec(
+grid = AbsoluteGridSpec(g
     nrows=2,
     ncols=2,
     figure=fig,
