@@ -3,8 +3,9 @@ name = "PyperPlot"
 version = "0.1.0"
 requires-python = ">= 3.9"
 authors = [{ name = "Moritz Sallermann", email = "moritzsallermann@gmail.com" }]
-description = "A class to lay out matplotlib plots in a grid with absolute measurements."
+description = "Lay out Matplotlib plots using absolute measurements."
 readme = "README.md"
+dependencies = ["matplotlib", "numpy", "pillow"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

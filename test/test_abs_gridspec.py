@@ -6,13 +6,11 @@ import numpy as np
 from pathlib import Path
 
 IMAGE_FOLDER = Path(__file__).parent / "images"
-OUTPUT_FOLDER = Path(__file__).parent / "output2"
-OUTPUT_FOLDER.mkdir(exist_ok=True)
 
 CM = AbsoluteGridSpec.cm
 
 
-def test_random():
+def test_random(tmp_path):
     fig = plt.figure(figsize=(15 * CM, 15 * CM))
 
     NROWS = 3
@@ -67,10 +65,11 @@ def test_random():
     image_crop = pyper_plot.image.crop_to_content(image)
     ax_img = fig.add_subplot(gs[-2, 0])
     pyper_plot.image.image_to_ax(ax_img, image_crop)
-    fig.savefig(OUTPUT_FOLDER / "test_fig.png", dpi=300)
+    fig.savefig(tmp_path / "test_fig.png", dpi=300)
+    plt.close(fig)
 
 
-def test_aspect_ratio():
+def test_aspect_ratio(tmp_path):
     fig = plt.figure(figsize=(20 * CM, 15 * CM))
 
     NROWS = 3
@@ -95,11 +94,11 @@ def test_aspect_ratio():
             pyper_plot.utilities.spine_axis(fig, ax)
 
     fig.suptitle("All diamonds should be perfectly inscribed in the squares!")
-    fig.savefig(OUTPUT_FOLDER / "test_fig_aspect.png", dpi=300)
+    fig.savefig(tmp_path / "test_fig_aspect.png", dpi=300)
+    plt.close(fig)
 
 
-def test_abs_margins():
-
+def test_abs_margins(tmp_path):
     fig = plt.figure(figsize=(30 * CM, 30 * CM))
 
     gs = AbsoluteGridSpec(
@@ -123,10 +122,11 @@ def test_abs_margins():
             )
             pyper_plot.utilities.spine_axis(fig, ax)
 
-    fig.savefig(OUTPUT_FOLDER / "test_fig_abs_margins.png", dpi=300)
+    fig.savefig(tmp_path / "test_fig_abs_margins.png", dpi=300)
+    plt.close(fig)
 
 
-def test_abs_margins_advanced():
+def test_abs_margins_advanced(tmp_path):
     fig = plt.figure(figsize=(30 * CM, 30 * CM))
 
     gs = AbsoluteGridSpec(
@@ -142,14 +142,12 @@ def test_abs_margins_advanced():
         abs_margin_bottom=2 * CM,
         abs_margin_top=2 * CM,
         abs_widths=[11 * CM, -2, -1, -1],
-        abs_heights=[-1 * CM, -2 *CM, 5 * CM],
+        abs_heights=[-1 * CM, -2 * CM, 5 * CM],
     )
 
     for irow in range(gs.nrows):
         for ax in pyper_plot.utilities.gs_row(irow, gs):
-            pyper_plot.image.image_to_ax(
-                ax, IMAGE_FOLDER / "square.png"
-            )
+            pyper_plot.image.image_to_ax(ax, IMAGE_FOLDER / "square.png")
             pyper_plot.utilities.spine_axis(fig, ax)
 
     ax = fig.add_subplot(gs[:, 0])
@@ -157,6 +155,7 @@ def test_abs_margins_advanced():
     pyper_plot.image.image_to_ax(ax, IMAGE_FOLDER / "square.png")
 
     fig.savefig(
-        OUTPUT_FOLDER / "test_fig_abs_margins_advanced.png",
+        tmp_path / "test_fig_abs_margins_advanced.png",
         dpi=300,
     )
+    plt.close(fig)

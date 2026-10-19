@@ -69,7 +69,7 @@ class AbsoluteGridSpec(GridSpec):
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
     ) -> None:
-        gridpsec_params = AbsoluteGridSpec.compute_gridspec_params(
+        gridspec_params = AbsoluteGridSpec.compute_gridspec_params(
             nrows=nrows,
             ncols=ncols,
             figure=figure,
@@ -84,22 +84,22 @@ class AbsoluteGridSpec(GridSpec):
         )
 
         figure.set_size_inches(
-            gridpsec_params.fig_width,
-            gridpsec_params.fig_height,
+            gridspec_params.fig_width,
+            gridspec_params.fig_height,
         )
 
         super().__init__(
             nrows=nrows,
             ncols=ncols,
             figure=figure,
-            left=gridpsec_params.left,
-            right=gridpsec_params.right,
-            bottom=gridpsec_params.bottom,
-            top=gridpsec_params.top,
-            wspace=gridpsec_params.wspace,
-            hspace=gridpsec_params.hspace,
-            width_ratios=gridpsec_params.width_ratios,
-            height_ratios=gridpsec_params.height_ratios,
+            left=gridspec_params.left,
+            right=gridspec_params.right,
+            bottom=gridspec_params.bottom,
+            top=gridspec_params.top,
+            wspace=gridspec_params.wspace,
+            hspace=gridspec_params.hspace,
+            width_ratios=gridspec_params.width_ratios,
+            height_ratios=gridspec_params.height_ratios,
         )
 
     @staticmethod
@@ -115,7 +115,7 @@ class AbsoluteGridSpec(GridSpec):
 
         if content_extent <= 0.0:
             msg = "Margins and space are too big. There is no space left for the content."
-            raise Exception(msg)
+            raise ValueError(msg)
 
         return content_extent
 
@@ -148,7 +148,7 @@ class AbsoluteGridSpec(GridSpec):
             ):
                 msg = f"You have specified absolute heights(widths) for the rows(columns) and an absolute height(width) of the content. The problem is that the sum of them is {np.sum(abs_widths_or_heights):.2f}, while the specified height(width) of the content is {abs_content_width_or_height:.2f}. These should be the same! A solution would be to adjust your specification or to make at least one of the row(column) heights(widths) relative by specifying a negative number."
 
-                raise Exception(msg)
+                raise ValueError(msg)
 
         content_ratios = [
             w / abs_content_width_or_height for w in abs_widths_or_heights
@@ -161,7 +161,9 @@ class AbsoluteGridSpec(GridSpec):
 
         if remaining_width_or_height < -AbsoluteGridSpec.ATOL:
             msg = f"Absolute widths/heights are larger than total height/width. Remaining height/width = {remaining_width_or_height}."
-            raise Exception(msg)
+            raise ValueError(msg)
+
+        remaining_width_or_height = max(remaining_width_or_height, 0.0)
 
         # Then, we compute the total weight of the negative widths
         total_weight_of_relative_widths = sum(
@@ -195,7 +197,7 @@ class AbsoluteGridSpec(GridSpec):
 
         if len(height_specifiers) > 1:
             msg = f"The height of the plot is overspecified, because you have set {height_specifiers})"
-            raise Exception(msg)
+            raise ValueError(msg)
 
     @staticmethod
     def compute_gridspec_params(
@@ -210,7 +212,7 @@ class AbsoluteGridSpec(GridSpec):
         abs_widths: Sequence[float] | None = None,
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
-    ):
+    ) -> GridSpecParams:
         """Set the layout of the figure in *absolute* units. All lengths are given in inches. Call this *before* fig() and gs().
 
         Args:
@@ -227,11 +229,18 @@ class AbsoluteGridSpec(GridSpec):
         fig_width, fig_height = figure.get_size_inches()
 
         # Compute the absolute space taken up by the margins
-        assert len(abs_horizontal_margins) == 2
+        if len(abs_horizontal_margins) != 2:
+            raise ValueError("abs_horizontal_margins must contain left and right")
         abs_margin_w = float(sum(abs_horizontal_margins))
 
-        assert len(abs_vertical_margins) == 2
+        if len(abs_vertical_margins) != 2:
+            raise ValueError("abs_vertical_margins must contain bottom and top")
         abs_margin_h = float(sum(abs_vertical_margins))
+
+        if abs_widths is not None and len(abs_widths) != ncols:
+            raise ValueError("abs_widths length must match ncols")
+        if abs_heights is not None and len(abs_heights) != nrows:
+            raise ValueError("abs_heights length must match nrows")
 
         # If the content width has not been specified, we compute it based on the current figure width
         # If it has been specified we compute the total figure width based on it
@@ -285,7 +294,7 @@ class AbsoluteGridSpec(GridSpec):
         else:
             height_ratios = None
 
-        # Compute the relative quantities that gridpsec needs
+        # Compute the relative quantities that GridSpec needs
         hspace = abs_hspace / abs_content_height * nrows
         wspace = abs_wspace / abs_content_width * ncols
         fig_height = abs_content_height + abs_margin_h + abs_hspace * (nrows - 1)

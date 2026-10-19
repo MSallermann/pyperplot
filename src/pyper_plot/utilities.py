@@ -17,10 +17,14 @@ _DEFAULT_SLICE = slice(None, None, None)
 def create_n_axes(
     gs: GridSpec, n: int, fig: Figure | None = None
 ) -> list[tuple[Axes, int, int]]:
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    if n == 0:
+        return []
 
     max_axes = gs.nrows * gs.ncols
     if n > max_axes:
-        raise Exception(
+        raise ValueError(
             f"Cannot create {n} axes on this gridspec with {gs.nrows} rows and {gs.ncols} cols. Maximum is {max_axes}."
         )
 
@@ -64,7 +68,7 @@ def gs_col(
         fig = gs.figure
     assert fig is not None
     return [
-        fig.add_subplot(gs[idx_col, idx_row])
+        fig.add_subplot(gs[idx_row, idx_col])
         for idx_row in range(gs.nrows)[idx_slice]
     ]
 
@@ -74,7 +78,7 @@ def label_subplot(
     text: str,
     pad_x: float = 0.0,
     pad_y: float = 0.025,
-    **kwargs: dict[str, Any],
+    **kwargs: Any,
 ) -> Text:
     """Labels a subplot at the left upper corner. Wrapper around ax.text"""
     if pad_x >= 0.0:
@@ -99,7 +103,7 @@ def label_subplot(
 
 
 def add_box_around_image(
-    ax: Axes, axes_image: AxesImage, **kwargs: dict[str, Any]
+    ax: Axes, axes_image: AxesImage, **kwargs: Any
 ) -> FancyBboxPatch:
     """Adds a box patch around an axis.
 
@@ -124,24 +128,23 @@ def spine_axis(
     fig: Figure,
     spec: Axes | SubplotSpec,
     color: ColorType = "black",
-    which: Sequence[Literal["left", "right", "top", "bottom"]] = [
+    which: Sequence[Literal["left", "right", "top", "bottom"]] = (
         "left",
         "right",
         "top",
         "bottom",
-    ],
+    ),
     zorder: int = 2,
     label: str = "spine",
     linewidth: float | None = None,
     linestyle: LineStyleType | None = None,
     alpha: float | None = None,
-):
-    try:
-        a = fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
-            spec.get_position(fig), zorder=zorder, label=label
-        )
-    except Exception:
-        a = fig.add_axes(spec, zorder=zorder, label=label)
+) -> Axes:
+    if isinstance(spec, Axes):
+        bounds = spec.get_position().bounds
+    else:
+        bounds = spec.get_position(fig).bounds
+    a = fig.add_axes(bounds, zorder=zorder, label=label)
 
     a.set_facecolor((0, 0, 0, 0))
     a.tick_params(
@@ -176,8 +179,8 @@ def create_inset_axis(
         containing_ax (plt.Axes): The Axes object relative to which to place the inset
         rel_width (float, optional): Width of the inset as a fraction of the containing ax. Defaults to 0.5.
         rel_height (float, optional): Height of the inset as a fraction of the containing ax. Defaults to 0.5.
-        margin_x (float, optional): X margin of the inset as a fraction of the containing ax. Defaults to 0.0.
-        margin_y (float, optional): Y margin of the inset as a fraction of the containing ax. Defaults to 0.0.
+        margin_x (float, optional): X margin from the selected left or right edge, as a fraction of the containing ax. Ignored when centered. Defaults to 0.0.
+        margin_y (float, optional): Y margin from the selected bottom or top edge, as a fraction of the containing ax. Ignored when centered. Defaults to 0.0.
         x_align (str, optional): Where to align the inset horizontally. One of ["left", "right", "center"]. Defaults to "left".
         y_align (str, optional): Where to align the inset horizontally. One of ["bottom", "top", "center"]. Defaults to "bottom".
 
@@ -185,38 +188,34 @@ def create_inset_axis(
         plt.Axes: The inset Axes object
 
     """
+    if containing_ax.figure is not fig:
+        raise ValueError("containing_ax must belong to fig")
+    if rel_width <= 0.0 or rel_height <= 0.0:
+        raise ValueError("relative width and height must be positive")
+
     bbox = containing_ax.get_position()
+    width = rel_width * bbox.width
+    height = rel_height * bbox.height
 
-    w = bbox.x1 - bbox.x0
-    h = bbox.y1 - bbox.y0
+    if x_align == "left":
+        left = bbox.x0 + margin_x * bbox.width
+    elif x_align == "right":
+        left = bbox.x1 - margin_x * bbox.width - width
+    elif x_align == "center":
+        left = bbox.x0 + 0.5 * (bbox.width - width)
+    else:
+        raise ValueError(f"unknown horizontal alignment: {x_align}")
 
-    def helper(
-        old_var0: float,
-        old_var1: float,
-        align: str,
-        wh: float,
-        rel_width_height: float,
-        margin_xy: float,
-    ) -> tuple[float, float]:
-        if align == "left" or align == "bottom":
-            new_var0 = old_var0 + margin_xy * rel_width_height * wh
-            new_var1 = new_var0 + rel_width_height * wh
-        elif align == "right" or align == "top":
-            new_var1 = old_var1 - margin_xy * rel_width_height * wh
-            new_var0 = new_var1 - rel_width_height * wh
-        elif align == "center":
-            new_var0 = old_var0 + 0.5 * (1.0 - rel_width_height) * wh
-            new_var1 = old_var1 - 0.5 * (1.0 - rel_width_height) * wh
-        else:
-            raise Exception(f"unknown align: {align}")
-        return new_var0, new_var1
+    if y_align == "bottom":
+        bottom = bbox.y0 + margin_y * bbox.height
+    elif y_align == "top":
+        bottom = bbox.y1 - margin_y * bbox.height - height
+    elif y_align == "center":
+        bottom = bbox.y0 + 0.5 * (bbox.height - height)
+    else:
+        raise ValueError(f"unknown vertical alignment: {y_align}")
 
-    x0, x1 = helper(bbox.x0, bbox.x1, x_align, w, rel_width, margin_x)
-    y0, y1 = helper(bbox.y0, bbox.y1, y_align, h, rel_height, margin_y)
-
-    return fig.add_axes(  # pyright: ignore[reportUnknownMemberType]
-        rect=(x0, y0, x1, y1)
-    )
+    return fig.add_axes(rect=(left, bottom, width, height))
 
 
 def clear_spines(ax: Axes) -> Axes:

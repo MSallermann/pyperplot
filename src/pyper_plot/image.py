@@ -6,7 +6,6 @@ from collections.abc import Sequence
 import numpy as np
 import numpy.typing as npt
 from PIL import Image
-import os
 from pathlib import Path
 
 
@@ -14,20 +13,21 @@ def open_image(path: str | Path) -> np.ndarray:
     return np.array(Image.open(path))
 
 
-def save_image(path: str | Path, image: npt.NDArray[np.floating] | Image.Image):
+def save_image(
+    path: str | Path, image: npt.NDArray[np.generic] | Image.Image
+) -> None:
     if not isinstance(image, Image.Image):
         image = Image.fromarray(image)
 
     image.save(path)
 
 
-def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[np.floating]) -> AxesImage:
-    if isinstance(image, str | Path):
-        if os.path.exists(image):
-            image = open_image(image)
-        else:
-            msg = f"`{image}` does not exist"
-            raise Exception(msg)
+def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[np.generic]) -> AxesImage:
+    if isinstance(image, (str, Path)):
+        path = Path(image)
+        if not path.exists():
+            raise FileNotFoundError(path)
+        image = open_image(path)
 
     ax.tick_params(  # type: ignore
         axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
@@ -40,29 +40,32 @@ def image_to_ax(ax: Axes, image: str | Path | npt.NDArray[np.floating]) -> AxesI
     return ax.imshow(image)  # pyright: ignore[reportUnknownMemberType]
 
 
+def _infer_background_color(image: np.ndarray) -> np.ndarray:
+    if image.ndim != 3:
+        raise ValueError("image must have shape (height, width, channels)")
+    if image.shape[0] == 0 or image.shape[1] == 0:
+        raise ValueError("image must not be empty")
+
+    corners = (image[0, 0], image[0, -1], image[-1, 0], image[-1, -1])
+    return max(
+        corners,
+        key=lambda color: sum(np.array_equal(color, other) for other in corners),
+    )
+
+
 def crop_to_content(
     image: np.ndarray,
     background_color: Sequence[float] | None = None,
-):
+) -> np.ndarray:
     """Crops an image array to its content."""
-    # If no background color is specified, we take the most frequent color among the corners
     if background_color is None:
-        corner_colors = [image[0, 0], image[0, -1], image[-1, 0], image[-1, -1]]
+        resolved_background = _infer_background_color(image)
+    else:
+        resolved_background = background_color
 
-        # As soon as we find the first repeated color we can stop, since a count of two will always be at least 50%
-        # TODO: these loops look stupid but they work
-        for cc in corner_colors:
-            for cc2 in corner_colors:
-                if np.all(cc == cc2):
-                    background_color = cc
-                    break
-            if np.all(cc == corner_colors[-1]):
-                break
-
-        background_color = corner_colors[0]
-
-    # I think I know why this works
-    indices = np.argwhere(np.any(image[:, :] != background_color, axis=2))
+    indices = np.argwhere(np.any(image != resolved_background, axis=2))
+    if len(indices) == 0:
+        raise ValueError("image contains only background pixels")
 
     lower_height = np.min(indices[:, 0])
     upper_height = np.max(indices[:, 0])
@@ -76,7 +79,7 @@ def replace_background_color(
     image: np.ndarray,
     replacement_color: Sequence[float],
     background_color: Sequence[float] | None = None,
-):
+) -> np.ndarray:
     """Replaced the background color of an image, specified as a numpy array.
 
     Args:
@@ -88,41 +91,41 @@ def replace_background_color(
         np.Array: the new image array
 
     """
-    N_CHANNELS = image.shape[-1]  # Number of channels in the picture
-    image_shape = image.shape
+    if image.ndim != 3:
+        raise ValueError("image must have shape (height, width, channels)")
 
-    # If no background color is specified, we take the most frequent color among the corners
+    n_channels = image.shape[-1]
+    replacement_color = list(replacement_color)
+
     if background_color is None:
-        corner_colors = [image[0, 0], image[0, -1], image[-1, 0], image[-1, -1]]
-        # As soon as we find the first repeated color we can stop, since a count of two will always be at least 50%
-        # TODO: these loops look stupid but they work
-        for cc in corner_colors:
-            for cc2 in corner_colors:
-                if np.all(cc == cc2):
-                    background_color = cc
-                    break
-            if np.all(cc == corner_colors[-1]):
-                break
-        background_color = corner_colors[0]
+        resolved_background = _infer_background_color(image).tolist()
+    else:
+        resolved_background = list(background_color)
 
-    N_CHANNELS_BG = len(replacement_color)
+    if np.issubdtype(image.dtype, np.integer):
+        opaque_alpha: float | int = np.iinfo(image.dtype).max
+    else:
+        opaque_alpha = 1.0
 
-    # If the background color has more channels than the picture, we need to introduce the alpha channel
-    if N_CHANNELS_BG > N_CHANNELS and replacement_color[-1] != 1.0:
-        image_copy = np.ones(shape=(image_shape[0], image_shape[1], 4))
-        image_copy[:, :, :3] = image
-        image = image_copy
-        assert background_color is not None
-        background_color = [
-            *background_color,
-            1.0,
-        ]  # Extend the background color with the alpha channel
-    elif N_CHANNELS_BG < N_CHANNELS:
-        replacement_color = [*replacement_color, 1.0]
+    if len(replacement_color) == n_channels + 1:
+        result = np.empty((*image.shape[:2], n_channels + 1), dtype=image.dtype)
+        result[..., :n_channels] = image
+        result[..., -1] = opaque_alpha
+        resolved_background.append(opaque_alpha)
+    elif len(replacement_color) == n_channels - 1:
+        result = image.copy()
+        replacement_color.append(opaque_alpha)
+    elif len(replacement_color) == n_channels:
+        result = image.copy()
+    else:
+        raise ValueError(
+            "replacement color must have the same number of channels as the "
+            "image, or differ by one alpha channel"
+        )
 
-    indices = np.argwhere(np.all(image[:, :] == background_color, axis=2))
-    image[indices[:, 0], indices[:, 1], :] = replacement_color
-    return image
+    mask = np.all(result == resolved_background, axis=2)
+    result[mask] = replacement_color
+    return result
 
 
 def crop(
@@ -131,9 +134,10 @@ def crop(
     right: int = 0,
     top: int = 0,
     bottom: int = 0,
-):
+) -> np.ndarray:
     """Crops an image by removing pixels from the left, right, top and bottom"""
-    assert left >= 0 and right >= 0 and top >= 0 and bottom >= 0
+    if min(left, right, top, bottom) < 0:
+        raise ValueError("crop values must be non-negative")
 
     height_old = image.shape[0]
     height_new = height_old - top - bottom
@@ -142,12 +146,12 @@ def crop(
     width_new = width_old - left - right
 
     if height_new <= 0:
-        raise Exception(
+        raise ValueError(
             "Cropping too much at top and/or bottom. No pixels remaining."
         )
 
     if width_new <= 0:
-        raise Exception(
+        raise ValueError(
             "Cropping too much at left and/or right. No pixels remaining."
         )
 
