@@ -7,6 +7,7 @@ def test_public_api():
     assert pyper_plot.__version__
     assert set(pyper_plot.__all__) == {
         "AbsoluteGridSpec",
+        "LengthUnit",
         "add_box_around_image",
         "clear_spines",
         "create_inset_axis",
@@ -21,6 +22,7 @@ def test_public_api():
         "open_image",
         "replace_background_color",
         "save_image",
+        "shade_grid_cell",
         "spine_axis",
         "utilities",
         "__version__",

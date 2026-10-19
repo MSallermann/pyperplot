@@ -8,7 +8,7 @@ modules remain available for namespaced use.
 from importlib.metadata import PackageNotFoundError, version
 
 from . import image, utilities
-from .abs_gridspec import AbsoluteGridSpec
+from .abs_gridspec import AbsoluteGridSpec, LengthUnit
 from .image import (
     crop,
     crop_to_content,
@@ -25,18 +25,18 @@ from .utilities import (
     gs_col,
     gs_row,
     label_subplot,
+    shade_grid_cell,
     spine_axis,
 )
 
 try:
     __version__ = version("PyperPlot")
-except (
-    PackageNotFoundError
-):  # pragma: no cover - only for an uninstalled source tree
+except PackageNotFoundError:  # pragma: no cover
     __version__ = "0+unknown"
 
 __all__ = [
     "AbsoluteGridSpec",
+    "LengthUnit",
     "add_box_around_image",
     "clear_spines",
     "create_inset_axis",
@@ -51,6 +51,7 @@ __all__ = [
     "open_image",
     "replace_background_color",
     "save_image",
+    "shade_grid_cell",
     "spine_axis",
     "utilities",
     "__version__",

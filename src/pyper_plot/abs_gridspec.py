@@ -1,3 +1,5 @@
+"""A Matplotlib ``GridSpec`` with physically sized layout parameters."""
+
 from __future__ import annotations
 from matplotlib.gridspec import GridSpec
 from collections.abc import Sequence, Iterable
@@ -5,20 +7,24 @@ from dataclasses import dataclass
 from matplotlib.figure import Figure
 import numpy as np
 
-from typing import TypeVar, Callable
+from typing import Callable, Literal, TypeVar
 
 T = TypeVar("T")
+LengthUnit = Literal["in", "cm"]
 
 
 def greater_eq_than_zero(w: float) -> bool:
+    """Return whether *w* represents an absolute, non-negative size."""
     return w >= 0
 
 
 def smaller_than_zero(w: float) -> bool:
+    """Return whether *w* represents a negative relative weight."""
     return w < 0
 
 
 def count_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> int:
+    """Count the values in *seq* for which *pred* is true."""
     count: int = 0
     for t in seq:
         if pred(t):
@@ -27,6 +33,7 @@ def count_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> int:
 
 
 def filter_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> list[T]:
+    """Return the values in *seq* for which *pred* is true."""
     res: list[T] = []
     for t in seq:
         if pred(t):
@@ -36,6 +43,8 @@ def filter_predicate(seq: Iterable[T], pred: Callable[[T], bool]) -> list[T]:
 
 @dataclass
 class GridSpecParams:
+    """Normalized values needed to initialize a Matplotlib ``GridSpec``."""
+
     fig_height: float
     fig_width: float
     height_ratios: list[float] | None
@@ -49,6 +58,46 @@ class GridSpecParams:
 
 
 class AbsoluteGridSpec(GridSpec):
+    """Lay out a Matplotlib grid using inches or centimetres.
+
+    All ``abs_*`` arguments use ``unit``. Matplotlib figures are measured in
+    inches internally, so centimetre inputs are converted before the grid is
+    created.
+
+    If ``abs_content_width`` or ``abs_content_height`` is provided, the
+    corresponding figure dimension is resized to contain the requested
+    content, margins, and inter-cell spacing. If omitted, the content extent
+    is derived from the figure's current size.
+
+    Entries in ``abs_widths`` and ``abs_heights`` have mixed semantics:
+    non-negative values are physical sizes, while negative values are relative
+    weights used to divide the remaining space. For example, ``[4, -2, -1]``
+    creates one 4-unit column and splits the remaining width 2:1.
+
+    Args:
+        nrows: Number of grid rows.
+        ncols: Number of grid columns.
+        figure: Figure that owns the grid. Its size may be updated.
+        abs_margin_left: Left figure margin.
+        abs_margin_bottom: Bottom figure margin.
+        abs_margin_right: Right figure margin.
+        abs_margin_top: Top figure margin.
+        abs_wspace: Horizontal space between adjacent columns.
+        abs_hspace: Vertical space between adjacent rows.
+        abs_widths: Optional size or relative weight for each column. Its
+            length must equal ``ncols``.
+        abs_heights: Optional size or relative weight for each row. Its length
+            must equal ``nrows``.
+        abs_content_width: Optional total width occupied by the columns,
+            excluding margins and spacing.
+        abs_content_height: Optional total height occupied by the rows,
+            excluding margins and spacing.
+        unit: Unit for every ``abs_*`` argument: ``"in"`` or ``"cm"``.
+
+    Raises:
+        ValueError: If dimensions are inconsistent or leave no content area.
+    """
+
     ATOL = 1e-5
 
     cm = 1.0 / 2.54
@@ -68,7 +117,9 @@ class AbsoluteGridSpec(GridSpec):
         abs_heights: Sequence[float] | None = None,
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
+        unit: LengthUnit = "in",
     ) -> None:
+        self.unit: LengthUnit = unit
         gridspec_params = AbsoluteGridSpec.compute_gridspec_params(
             nrows=nrows,
             ncols=ncols,
@@ -81,6 +132,7 @@ class AbsoluteGridSpec(GridSpec):
             abs_widths=abs_widths,
             abs_content_width=abs_content_width,
             abs_content_height=abs_content_height,
+            unit=unit,
         )
 
         figure.set_size_inches(
@@ -109,6 +161,13 @@ class AbsoluteGridSpec(GridSpec):
         abs_hwspace: float,
         abs_margin_hw: float,
     ) -> float:
+        """Return content size after subtracting margins and cell spacing.
+
+        All arguments must use the same unit.
+
+        Raises:
+            ValueError: If margins and spacing consume the entire extent.
+        """
         content_extent = (
             total_extent - abs_hwspace * (ncols_or_rows - 1) - abs_margin_hw
         )
@@ -126,12 +185,24 @@ class AbsoluteGridSpec(GridSpec):
         abs_hwspace: float,
         abs_margin_hw: float,
     ) -> float:
+        """Return total size after adding margins and cell spacing."""
         return content_extent + abs_hwspace * (ncols_or_rows - 1) + abs_margin_hw
 
     @staticmethod
     def compute_content_ratios(
         abs_content_width_or_height: float, abs_widths_or_heights: Sequence[float]
     ) -> list[float]:
+        """Convert mixed absolute sizes and relative weights to ratios.
+
+        Non-negative entries are fixed physical sizes. Negative entries are
+        weights that share the space left after fixed sizes are subtracted.
+        The returned ratios are suitable for Matplotlib's ``width_ratios`` or
+        ``height_ratios``.
+
+        Raises:
+            ValueError: If fixed sizes exceed the content extent or, without
+                relative entries, do not add up to it.
+        """
         # Count how many of the widths are smaller than zero
         num_widths_smaller_than_zero = count_predicate(
             abs_widths_or_heights, smaller_than_zero
@@ -187,7 +258,8 @@ class AbsoluteGridSpec(GridSpec):
     def check_height_specifiers(
         abs_content_height: float | None,
         height: float | None,
-    ):
+    ) -> None:
+        """Reject simultaneous total-height and content-height specifications."""
         # Check if overspecified
         height_specifiers: list[str] = []
         if abs_content_height is not None:
@@ -212,20 +284,64 @@ class AbsoluteGridSpec(GridSpec):
         abs_widths: Sequence[float] | None = None,
         abs_content_width: float | None = None,
         abs_content_height: float | None = None,
+        unit: LengthUnit = "in",
     ) -> GridSpecParams:
-        """Set the layout of the figure in *absolute* units. All lengths are given in inches. Call this *before* fig() and gs().
+        """Compute GridSpec parameters from dimensions in the selected unit.
 
         Args:
-            abs_hspace (float): The space between each row of the grid. Defaults to 0.5*cm.
-            abs_wspace (float): The space between each column of the grid. Defaults to 0.5*cm.
-            abs_vertical_margins (list): Bottom and top margins. Defaults to [0.15 * cm, 0.15 * cm].
-            abs_horizontal_margins (list): Left and right margins. Defaults to [0.15 * cm, 0.15 * cm].
-            abs_heights (list, optional): Heights of the rows. Defaults to None. Negative values will be used as relative weights.
-            abs_widths (list, optional): Widths of the columns. Defaults to None. Negative values will be used as relative weights.
-            abs_content_width (float, optional): Absolute width of the content. !WARNING will recompute the total width of the figure, based on wspace and margins. It is usually better to keep the width fixed. Defaults to None.
-            abs_content_height (float, optional): Absolute height of the content. This will only be used if aspect_ratio is None. !WARNING will recompute the total height of the figure.
+            figure: Figure providing dimensions when content extents are
+                omitted.
+            nrows: Number of rows.
+            ncols: Number of columns.
+            abs_hspace: Space between adjacent rows.
+            abs_wspace: Space between adjacent columns.
+            abs_vertical_margins: Bottom and top margins.
+            abs_horizontal_margins: Left and right margins.
+            abs_heights: Optional sizes or relative weights for the rows.
+            abs_widths: Optional sizes or relative weights for the columns.
+            abs_content_width: Optional total width occupied by columns.
+            abs_content_height: Optional total height occupied by rows.
+            unit: Unit used by every ``abs_*`` argument.
 
+        Returns:
+            Figure dimensions in inches and normalized GridSpec parameters.
+
+        Raises:
+            ValueError: If the unit, dimensions, or sequence lengths are
+                invalid.
         """
+        if unit == "in":
+            inches_per_unit = 1.0
+        elif unit == "cm":
+            inches_per_unit = AbsoluteGridSpec.cm
+        else:
+            raise ValueError(f"unknown length unit: {unit!r}")
+
+        def convert_length(value: float) -> float:
+            return value * inches_per_unit
+
+        def convert_sizes(values: Sequence[float] | None) -> list[float] | None:
+            if values is None:
+                return None
+            return [
+                convert_length(value) if value >= 0.0 else value for value in values
+            ]
+
+        abs_hspace = convert_length(abs_hspace)
+        abs_wspace = convert_length(abs_wspace)
+        abs_vertical_margins = [
+            convert_length(value) for value in abs_vertical_margins
+        ]
+        abs_horizontal_margins = [
+            convert_length(value) for value in abs_horizontal_margins
+        ]
+        abs_heights = convert_sizes(abs_heights)
+        abs_widths = convert_sizes(abs_widths)
+        if abs_content_width is not None:
+            abs_content_width = convert_length(abs_content_width)
+        if abs_content_height is not None:
+            abs_content_height = convert_length(abs_content_height)
+
         fig_width, fig_height = figure.get_size_inches()
 
         # Compute the absolute space taken up by the margins

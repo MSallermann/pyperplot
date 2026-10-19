@@ -1,4 +1,8 @@
-from pyper_plot.abs_gridspec import AbsoluteGridSpec
+from typing import cast
+
+import pytest
+
+from pyper_plot.abs_gridspec import AbsoluteGridSpec, LengthUnit
 import pyper_plot.utilities
 import pyper_plot.image
 import matplotlib.pyplot as plt
@@ -8,6 +12,68 @@ from pathlib import Path
 IMAGE_FOLDER = Path(__file__).parent / "images"
 
 CM = AbsoluteGridSpec.cm
+
+
+def _make_equivalent_grid(unit: LengthUnit, units_per_inch: float):
+    fig = plt.figure()
+    gs = AbsoluteGridSpec(
+        figure=fig,
+        nrows=2,
+        ncols=2,
+        abs_content_width=4 * units_per_inch,
+        abs_content_height=3 * units_per_inch,
+        abs_wspace=0.25 * units_per_inch,
+        abs_hspace=0.5 * units_per_inch,
+        abs_margin_left=0.5 * units_per_inch,
+        abs_margin_right=0.75 * units_per_inch,
+        abs_margin_bottom=0.25 * units_per_inch,
+        abs_margin_top=1 * units_per_inch,
+        abs_widths=[1 * units_per_inch, -1],
+        abs_heights=[-2, 1 * units_per_inch],
+        unit=unit,
+    )
+    return fig, gs
+
+
+def test_centimetres_and_inches_produce_equivalent_layouts():
+    fig_in, gs_in = _make_equivalent_grid("in", 1.0)
+    fig_cm, gs_cm = _make_equivalent_grid("cm", 2.54)
+
+    assert gs_in.unit == "in"
+    assert gs_cm.unit == "cm"
+    np.testing.assert_allclose(fig_in.get_size_inches(), fig_cm.get_size_inches())
+    widths_in = cast(list[float], gs_in.get_width_ratios())
+    widths_cm = cast(list[float], gs_cm.get_width_ratios())
+    heights_in = cast(list[float], gs_in.get_height_ratios())
+    heights_cm = cast(list[float], gs_cm.get_height_ratios())
+    np.testing.assert_allclose(widths_in, widths_cm)
+    np.testing.assert_allclose(heights_in, heights_cm)
+    for positions_in, positions_cm in zip(
+        gs_in.get_grid_positions(fig_in),
+        gs_cm.get_grid_positions(fig_cm),
+    ):
+        np.testing.assert_allclose(positions_in, positions_cm)
+
+    plt.close(fig_in)
+    plt.close(fig_cm)
+
+
+def test_unknown_length_unit_is_rejected():
+    fig = plt.figure()
+
+    with pytest.raises(ValueError, match="unknown length unit"):
+        AbsoluteGridSpec(
+            figure=fig,
+            nrows=1,
+            ncols=1,
+            abs_margin_left=0,
+            abs_margin_right=0,
+            abs_margin_bottom=0,
+            abs_margin_top=0,
+            unit=cast(LengthUnit, "mm"),
+        )
+
+    plt.close(fig)
 
 
 def test_random(tmp_path):

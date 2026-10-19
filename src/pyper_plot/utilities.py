@@ -1,15 +1,17 @@
+"""Convenience functions for creating and decorating Matplotlib axes."""
+
 from __future__ import annotations
 
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
-from matplotlib.image import AxesImage
-from matplotlib.text import Text
-from matplotlib.gridspec import GridSpec, SubplotSpec
-from matplotlib.typing import ColorType, LineStyleType
 from collections.abc import Sequence
-from typing import Literal
-from matplotlib.patches import FancyBboxPatch
-from typing import Any
+from typing import Any, Literal
+
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.image import AxesImage
+from matplotlib.patches import FancyBboxPatch, Rectangle
+from matplotlib.text import Text
+from matplotlib.typing import ColorType, LineStyleType
 
 _DEFAULT_SLICE = slice(None, None, None)
 
@@ -17,6 +19,19 @@ _DEFAULT_SLICE = slice(None, None, None)
 def create_n_axes(
     gs: GridSpec, n: int, fig: Figure | None = None
 ) -> list[tuple[Axes, int, int]]:
+    """Create the first *n* axes in a grid, in row-major order.
+
+    Args:
+        gs: Grid whose cells receive the new axes.
+        n: Number of axes to create.
+        fig: Owning figure. Defaults to ``gs.figure``.
+
+    Returns:
+        Tuples containing each new axes and its zero-based row and column.
+
+    Raises:
+        ValueError: If *n* is negative or exceeds the number of grid cells.
+    """
     if n < 0:
         raise ValueError("n must be non-negative")
     if n == 0:
@@ -49,6 +64,17 @@ def gs_row(
     fig: Figure | None = None,
     idx_slice: slice = _DEFAULT_SLICE,
 ) -> list[Axes]:
+    """Create axes in selected columns of one grid row.
+
+    Args:
+        idx_row: Row index accepted by the GridSpec, including negative indices.
+        gs: Grid whose cells receive the new axes.
+        fig: Owning figure. Defaults to ``gs.figure``.
+        idx_slice: Slice applied to the grid's column indices.
+
+    Returns:
+        New axes ordered from the first selected column to the last.
+    """
     if fig is None:
         fig = gs.figure
     assert fig is not None
@@ -64,6 +90,17 @@ def gs_col(
     fig: Figure | None = None,
     idx_slice: slice = _DEFAULT_SLICE,
 ) -> list[Axes]:
+    """Create axes in selected rows of one grid column.
+
+    Args:
+        idx_col: Column index accepted by the GridSpec, including negative indices.
+        gs: Grid whose cells receive the new axes.
+        fig: Owning figure. Defaults to ``gs.figure``.
+        idx_slice: Slice applied to the grid's row indices.
+
+    Returns:
+        New axes ordered from the first selected row to the last.
+    """
     if fig is None:
         fig = gs.figure
     assert fig is not None
@@ -80,7 +117,13 @@ def label_subplot(
     pad_y: float = 0.025,
     **kwargs: Any,
 ) -> Text:
-    """Labels a subplot at the left upper corner. Wrapper around ax.text"""
+    """Add a label near the upper-left corner of an axes.
+
+    ``pad_x`` and ``pad_y`` use axes coordinates. Their signs also determine
+    text alignment so the label extends away from the axes boundary.
+
+    Additional keyword arguments are forwarded to ``Axes.text``.
+    """
     if pad_x >= 0.0:
         ha = "left"
     else:
@@ -105,15 +148,15 @@ def label_subplot(
 def add_box_around_image(
     ax: Axes, axes_image: AxesImage, **kwargs: Any
 ) -> FancyBboxPatch:
-    """Adds a box patch around an axis.
+    """Draw a ``FancyBboxPatch`` around the displayed extent of an image.
 
     Args:
-        ax (plt.ax): The ax
-        axes_image (_type_): The image
+        ax: Axes containing the image.
+        axes_image: Image whose data extent defines the box.
+        **kwargs: Styling forwarded to ``FancyBboxPatch``.
 
     Returns:
-        FancyBboxPatch: Returns the box patch
-
+        The patch added to *ax*.
     """
     extent = axes_image.get_extent()
     left, right, bottom, top = extent
@@ -140,6 +183,25 @@ def spine_axis(
     linestyle: LineStyleType | None = None,
     alpha: float | None = None,
 ) -> Axes:
+    """Overlay a transparent axes that draws selected spines.
+
+    This is useful when images or artists obscure the original axes frame.
+    The overlay has no ticks or labels and occupies the position of *spec*.
+
+    Args:
+        fig: Figure that owns the original and overlay axes.
+        spec: Existing axes or subplot specification to outline.
+        color: Spine color.
+        which: Spines to show.
+        zorder: Drawing order of the overlay axes.
+        label: Matplotlib label assigned to the overlay axes.
+        linewidth: Optional spine width.
+        linestyle: Optional spine style.
+        alpha: Optional spine opacity.
+
+    Returns:
+        The transparent overlay axes.
+    """
     if isinstance(spec, Axes):
         bounds = spec.get_position().bounds
     else:
@@ -173,20 +235,29 @@ def create_inset_axis(
     x_align: Literal["left", "right", "center"] = "left",
     y_align: Literal["bottom", "top", "center"] = "bottom",
 ) -> Axes:
-    """Creates an axis for an inset.
+    """Create an inset axes positioned relative to another axes.
+
+    Width, height, and margins are fractions of the containing axes. Margins
+    are measured inward from the selected edge and ignored for centered
+    alignment. The inset position is fixed in figure coordinates when this
+    function is called.
 
     Args:
-        containing_ax (plt.Axes): The Axes object relative to which to place the inset
-        rel_width (float, optional): Width of the inset as a fraction of the containing ax. Defaults to 0.5.
-        rel_height (float, optional): Height of the inset as a fraction of the containing ax. Defaults to 0.5.
-        margin_x (float, optional): X margin from the selected left or right edge, as a fraction of the containing ax. Ignored when centered. Defaults to 0.0.
-        margin_y (float, optional): Y margin from the selected bottom or top edge, as a fraction of the containing ax. Ignored when centered. Defaults to 0.0.
-        x_align (str, optional): Where to align the inset horizontally. One of ["left", "right", "center"]. Defaults to "left".
-        y_align (str, optional): Where to align the inset horizontally. One of ["bottom", "top", "center"]. Defaults to "bottom".
+        fig: Figure that will own the inset.
+        containing_ax: Axes used as the positioning reference.
+        rel_width: Inset width divided by the containing axes width.
+        rel_height: Inset height divided by the containing axes height.
+        margin_x: Horizontal margin from a selected edge.
+        margin_y: Vertical margin from a selected edge.
+        x_align: Horizontal alignment within the containing axes.
+        y_align: Vertical alignment within the containing axes.
 
     Returns:
-        plt.Axes: The inset Axes object
+        The newly created inset axes.
 
+    Raises:
+        ValueError: If the containing axes belongs to another figure, a size
+            is non-positive, or an alignment is unknown.
     """
     if containing_ax.figure is not fig:
         raise ValueError("containing_ax must belong to fig")
@@ -219,6 +290,7 @@ def create_inset_axis(
 
 
 def clear_spines(ax: Axes) -> Axes:
+    """Hide all spines, ticks, labels, and the opaque axes background."""
     ax.set_facecolor((0, 0, 0, 0))
     ax.tick_params(  # pyright: ignore[reportUnknownMemberType]
         axis="both", which="both", bottom=0, left=0, labelbottom=0, labelleft=0
@@ -227,3 +299,37 @@ def clear_spines(ax: Axes) -> Axes:
         s = ax.spines[k]
         s.set_visible(False)
     return ax
+
+
+def shade_grid_cell(
+    fig: Figure,
+    spec: SubplotSpec,
+    facecolor: ColorType,
+    edgecolor: ColorType = "None",
+    alpha: float = 1.0,
+    zorder: int = -1,
+) -> None:
+    """Add a figure-level rectangle behind a GridSpec cell or cell span.
+
+    Args:
+        fig: Figure containing the grid.
+        spec: Cell or cell span to shade, such as ``grid[0, :]``.
+        facecolor: Rectangle fill color.
+        edgecolor: Rectangle edge color.
+        alpha: Rectangle opacity.
+        zorder: Drawing order. The default places the rectangle behind axes.
+    """
+    bbox = spec.get_position(fig)
+
+    fig.add_artist(
+        Rectangle(
+            (bbox.x0, bbox.y0),
+            bbox.width,
+            bbox.height,
+            facecolor=facecolor,
+            transform=fig.transFigure,
+            edgecolor=edgecolor,
+            alpha=alpha,
+            zorder=zorder,
+        )
+    )
