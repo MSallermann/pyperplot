@@ -5,7 +5,7 @@ requires-python = ">= 3.9"
 authors = [{ name = "Moritz Sallermann", email = "moritzsallermann@gmail.com" }]
 description = "Lay out Matplotlib plots using absolute measurements."
 readme = "README.md"
-dependencies = ["matplotlib", "numpy", "pillow"]
+dependencies = ["matplotlib>=3.8", "numpy", "pillow"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
